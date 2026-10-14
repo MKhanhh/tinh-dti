@@ -1,7 +1,5 @@
-import base64
 import calendar
 import io
-import json
 import math
 import re
 import unicodedata
@@ -9,7 +7,6 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 import pandas as pd
-import requests
 import streamlit as st
 
 # =====================================================================
@@ -298,57 +295,8 @@ def ap_dung_mau():
     st.session_state["lt_ls_ver"] = st.session_state.get("lt_ls_ver", 0) + 1
 
 
-DE_MAU = {
-    "Đề trang 197": (
-        "Khách hàng vay 700 triệu, vay 5 năm, lãi suất cho vay 9%/năm cố định 3 tháng đầu tiên, tháng thứ 4 "
-        "trở đi lãi suất cho vay bằng lãi suất huy động + biên độ 4 %, biết 3 tháng sau lãi suất huy động là "
-        "10%/năm. Ngân hàng thu lãi ngày 15 tây hàng tháng, ngân hàng tính lãi ngày 10 tây hàng tháng. Ngân hàng "
-        "giải ngân ngày 22/10/2023. Lập bảng kế hoạch trả nợ cho 5 kỳ đầu tiên? (Hàng tháng ngân hàng thu tiền "
-        "lãi và thu một phần nợ gốc)."
-    ),
-    "Đề trang 193": (
-        "Khách hàng vay 800 triệu, vay 5 năm, lãi suất cho vay 9%/năm cố định 3 tháng đầu tiên, tháng thứ 4 "
-        "trở đi lãi suất cho vay bằng lãi suất huy động + biên độ 4 %, biết 3 tháng sau lãi suất huy động là "
-        "8%/năm. Ngân hàng thu lãi ngày 10 tây hàng tháng, ngân hàng tính lãi ngày 5 tây hàng tháng. Ngân hàng "
-        "giải ngân ngày 28/03/2024. Lập bảng kế hoạch trả nợ cho 5 kỳ đầu tiên? Biết hàng tháng ngân hàng thu "
-        "tiền lãi và thu một phần nợ gốc (trả góp)."
-    ),
-}
 MA_PT = {"goc_deu": PTL_GOC_DEU, "nien_kim": PTL_NIEN_KIM, "goc_cuoi_ky": PTL_GOC_CUOI,
          "goc_dinh_ky": PTL_GOC_DINH_KY}
-GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
-
-PROMPT_DOC_DE = """Bạn là trợ lý môn Thẩm định tín dụng. Đọc đề bài (chữ và/hoặc ảnh) về lập bảng kế hoạch trả nợ
-và trích các thông số. CHỈ trả về một đối tượng JSON, không giải thích, theo đúng các khóa sau
-(khóa nào đề không cho thì để null):
-{
-  "so_tien_trieu": số tiền vay quy ra TRIỆU đồng (1 tỷ = 1000),
-  "thoi_han": số nguyên,
-  "don_vi_thoi_han": "năm" hoặc "tháng",
-  "ngay_giai_ngan": "dd/mm/yyyy",
-  "ngay_tinh_lai": ngày tính lãi (chốt lãi) hằng tháng, số nguyên 1-31,
-  "ngay_thu_no": ngày thu nợ / thu lãi hằng tháng, số nguyên 1-31,
-  "phuong_thuc": một trong "goc_deu" | "nien_kim" | "goc_cuoi_ky" | "goc_dinh_ky",
-  "chu_ky_goc_thang": số tháng giữa 2 lần trả gốc (chỉ dùng khi goc_dinh_ky, VD theo quý = 3),
-  "giai_doan_lai_suat": [{"tu_ky": số nguyên, "lai_suat_co_so": %/năm, "bien_do": %/năm, "ghi_chu": "..."}],
-  "so_ky_hien_thi": số kỳ đề yêu cầu lập bảng (VD "5 kỳ đầu tiên" = 5),
-  "so_ngay_trong_nam": 365 hoặc 360,
-  "ghi_chu": ["các giả định hoặc điểm chưa rõ trong đề"]
-}
-Quy tắc:
-- "Ngân hàng thu lãi ngày X" là ngay_thu_no; "ngân hàng tính lãi ngày Y" là ngay_tinh_lai. Nếu đề chỉ cho một ngày
-  thì dùng ngày đó cho cả hai.
-- Lãi suất "cố định N tháng đầu" => giai đoạn {"tu_ky":1, "lai_suat_co_so": lãi suất đó, "bien_do":0}.
-  "Tháng thứ N+1 trở đi bằng lãi suất huy động + biên độ b%, biết lãi suất huy động là h%" =>
-  {"tu_ky": N+1, "lai_suat_co_so": h, "bien_do": b}. Chỉ một mức lãi suất => một giai đoạn tu_ky = 1.
-- Lãi suất cho theo %/tháng thì nhân 12 để ra %/năm.
-- "Hằng tháng thu tiền lãi và một phần nợ gốc", "trả góp", "gốc đều", "dư nợ giảm dần" => "goc_deu".
-  Chỉ chọn "nien_kim" khi đề nói số tiền trả mỗi kỳ bằng nhau / niên kim / trả đều cả gốc và lãi.
-  "Trả lãi hằng tháng, gốc trả một lần cuối kỳ" => "goc_cuoi_ky". Gốc trả theo quý/6 tháng => "goc_dinh_ky".
-- Mặc định so_ngay_trong_nam = 365 nếu đề không nói.
-"""
-
-
 def _so(s: str) -> float:
     s = s.strip()
     if re.fullmatch(r"\d{1,3}(\.\d{3})+", s):  # 1.200 → 1200
@@ -357,7 +305,7 @@ def _so(s: str) -> float:
 
 
 def doc_de_quy_tac(text: str) -> dict:
-    """Nhận diện thông số theo mẫu câu quen thuộc (dự phòng khi không dùng được AI)."""
+    """Nhận diện thông số trong đề bài theo các mẫu câu quen thuộc."""
     t = re.sub(r"\s+", " ", unicodedata.normalize("NFC", text).lower())
     N = r"(\d[\d.,]*)"
     kq, ghi_chu = {}, []
@@ -424,45 +372,6 @@ def doc_de_quy_tac(text: str) -> dict:
     return kq
 
 
-def lay_gemini_key() -> str:
-    try:
-        k = st.secrets.get("GEMINI_API_KEY", "")
-    except Exception:  # chưa có file secrets
-        k = ""
-    return k or st.session_state.get("lt_key", "")
-
-
-def doc_de_gemini(text: str, anh: list, key: str) -> tuple[dict, str]:
-    parts = [{"text": PROMPT_DOC_DE + "\n\nĐỀ BÀI:\n" + (text.strip() or "(xem ảnh đính kèm)")}]
-    for f in anh:
-        parts.append({"inlineData": {"mimeType": f.type or "image/png",
-                                      "data": base64.b64encode(f.getvalue()).decode()}})
-    body = {"contents": [{"parts": parts}],
-            "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}}
-    try:
-        models = [st.secrets.get("GEMINI_MODEL")] if st.secrets.get("GEMINI_MODEL") else GEMINI_MODELS
-    except Exception:
-        models = GEMINI_MODELS
-    loi = ""
-    for model in models:
-        r = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=body, timeout=60)
-        if r.status_code == 404:  # model không tồn tại / đã ngừng → thử model tiếp theo
-            loi = f"Không tìm thấy model {model}"
-            continue
-        if r.status_code != 200:
-            try:
-                msg = r.json()["error"]["message"]
-            except Exception:
-                msg = r.text[:200]
-            raise RuntimeError(f"Gemini báo lỗi {r.status_code}: {msg}")
-        out = "".join(p.get("text", "") for p in r.json()["candidates"][0]["content"]["parts"])
-        out = re.sub(r"^```(?:json)?|```$", "", out.strip()).strip()
-        return json.loads(out), model
-    raise RuntimeError(loi or "Không gọi được Gemini.")
-
-
 def ap_dung_thong_so(kq: dict) -> list:
     """Ghi thông số đọc được vào các ô nhập. Trả về danh sách những gì đã điền."""
     ss, da_dien = st.session_state, []
@@ -509,62 +418,33 @@ def ap_dung_thong_so(kq: dict) -> list:
     return da_dien
 
 
-def chen_de_mau():
-    if st.session_state.get("lt_de_mau") in DE_MAU:
-        st.session_state["lt_de"] = DE_MAU[st.session_state["lt_de_mau"]]
-
-
 def khu_vuc_nhap_de():
-    html('<div class="sec">📝 Gửi đề bài <small>— dán chữ và/hoặc tải ảnh chụp đề, app tự điền thông số và lập bảng</small></div>')
-    st.selectbox("Chèn đề mẫu (tuỳ chọn)", ["—"] + list(DE_MAU), key="lt_de_mau", on_change=chen_de_mau)
+    html('<div class="sec">📝 Gửi đề bài <small>— dán nội dung đề, app tự điền thông số và lập bảng</small></div>')
     st.text_area("Nội dung đề bài", key="lt_de", height=150,
                  placeholder="VD: Khách hàng vay 700 triệu, vay 5 năm, lãi suất cho vay 9%/năm cố định 3 tháng đầu...")
-    st.file_uploader("Ảnh chụp đề (PNG/JPG, có thể chọn nhiều ảnh)", type=["png", "jpg", "jpeg", "webp"],
-                     accept_multiple_files=True, key="lt_anh")
-    co_key = bool(lay_gemini_key())
-    if not co_key:
-        with st.expander("🔑 Chưa có Gemini API key — bấm để nhập tạm"):
-            st.text_input("Gemini API key", type="password", key="lt_key",
-                          help="Chỉ lưu trong phiên làm việc này. Nên cài cố định trong Settings → Secrets "
-                               "của Streamlit Cloud với tên GEMINI_API_KEY.")
-            st.caption("Không có key: đề dán chữ vẫn được đọc bằng quy tắc; ảnh chụp thì cần key.")
-
-    if st.button("🤖  Đọc đề & lập bảng", type="primary", width="stretch"):
+    if st.button("🔎  Đọc đề & lập bảng", type="primary", width="stretch"):
         xu_ly_de()
     tb = st.session_state.get("lt_thong_bao")
     if tb:
-        nguon, da_dien, canh_bao = tb
+        da_dien, canh_bao = tb
         if da_dien:
-            st.success(f"Đã đọc đề bằng {nguon}: " + "; ".join(da_dien) + ". Bảng trả nợ ở bên dưới.")
-        else:
-            st.error(f"Không nhận diện được thông số nào ({nguon}). Hãy kiểm tra đề hoặc nhập tay.")
+            st.success("Đã đọc đề: " + "; ".join(da_dien) + ". Bảng trả nợ ở bên dưới.")
         for c in canh_bao:
             st.warning(c)
 
 
 def xu_ly_de():
-    text, anh = st.session_state.get("lt_de", ""), st.session_state.get("lt_anh") or []
-    if not text.strip() and not anh:
-        st.session_state["lt_thong_bao"] = ("", [], ["Hãy dán nội dung đề hoặc tải ảnh chụp đề."])
+    text = st.session_state.get("lt_de", "")
+    if not text.strip():
+        st.session_state["lt_thong_bao"] = ([], ["Hãy dán nội dung đề bài vào ô trên."])
         return
-
-    key, kq, nguon, canh_bao = lay_gemini_key(), None, "", []
-    if key:
-        with st.spinner("Gemini đang đọc đề..."):
-            try:
-                kq, model = doc_de_gemini(text, anh, key)
-                nguon = f"AI Gemini ({model})"
-            except Exception as e:  # noqa: BLE001
-                canh_bao.append(f"Không dùng được Gemini: {e}")
-    if kq is None:
-        if not text.strip():
-            st.session_state["lt_thong_bao"] = ("", [], ["Ảnh chụp đề cần Gemini API key để đọc."] + canh_bao)
-            return
-        kq, nguon = doc_de_quy_tac(text), "quy tắc nhận diện mẫu câu"
-    canh_bao += [str(c) for c in (kq.get("ghi_chu") or []) if c]
+    kq = doc_de_quy_tac(text)
+    canh_bao = [str(c) for c in (kq.get("ghi_chu") or []) if c]
     da_dien = ap_dung_thong_so(kq)
-    st.session_state["lt_da_lap"] = True
-    st.session_state["lt_thong_bao"] = (nguon, da_dien, canh_bao)
+    if not da_dien:
+        canh_bao.insert(0, "Không nhận diện được thông số nào. Hãy kiểm tra lại đề hoặc nhập tay bên dưới.")
+    st.session_state["lt_da_lap"] = bool(da_dien) or st.session_state.get("lt_da_lap", False)
+    st.session_state["lt_thong_bao"] = (da_dien, canh_bao)
 
 
 def trang_lich_tra_no():
