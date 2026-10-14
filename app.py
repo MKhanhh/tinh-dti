@@ -1,10 +1,15 @@
+import base64
 import calendar
 import io
+import json
 import math
-from datetime import date, timedelta
+import re
+import unicodedata
+from datetime import date, datetime, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, Decimal
 
 import pandas as pd
+import requests
 import streamlit as st
 
 # =====================================================================
@@ -256,7 +261,7 @@ def lap_lich_tra_no(P, n, ngay_gn, ngay_lai, ngay_thu, pt, chu_ky_goc, giai_doan
         if k == n or goc > du_no:
             goc = du_no
 
-        ngay_tra = cong_thang(chot, 0 if ngay_thu > ngay_lai else 1, ngay_thu)
+        ngay_tra = cong_thang(chot, 0 if ngay_thu >= ngay_lai else 1, ngay_thu)
         cong_thuc = " + ".join(
             f"{so_vn(du_no, so_le)}*{so_vn(r * 100, 4)}%*{d}/{co_so}" for d, r in doan)
         rows.append({
@@ -293,16 +298,284 @@ def ap_dung_mau():
     st.session_state["lt_ls_ver"] = st.session_state.get("lt_ls_ver", 0) + 1
 
 
+DE_MAU = {
+    "Đề trang 197": (
+        "Khách hàng vay 700 triệu, vay 5 năm, lãi suất cho vay 9%/năm cố định 3 tháng đầu tiên, tháng thứ 4 "
+        "trở đi lãi suất cho vay bằng lãi suất huy động + biên độ 4 %, biết 3 tháng sau lãi suất huy động là "
+        "10%/năm. Ngân hàng thu lãi ngày 15 tây hàng tháng, ngân hàng tính lãi ngày 10 tây hàng tháng. Ngân hàng "
+        "giải ngân ngày 22/10/2023. Lập bảng kế hoạch trả nợ cho 5 kỳ đầu tiên? (Hàng tháng ngân hàng thu tiền "
+        "lãi và thu một phần nợ gốc)."
+    ),
+    "Đề trang 193": (
+        "Khách hàng vay 800 triệu, vay 5 năm, lãi suất cho vay 9%/năm cố định 3 tháng đầu tiên, tháng thứ 4 "
+        "trở đi lãi suất cho vay bằng lãi suất huy động + biên độ 4 %, biết 3 tháng sau lãi suất huy động là "
+        "8%/năm. Ngân hàng thu lãi ngày 10 tây hàng tháng, ngân hàng tính lãi ngày 5 tây hàng tháng. Ngân hàng "
+        "giải ngân ngày 28/03/2024. Lập bảng kế hoạch trả nợ cho 5 kỳ đầu tiên? Biết hàng tháng ngân hàng thu "
+        "tiền lãi và thu một phần nợ gốc (trả góp)."
+    ),
+}
+MA_PT = {"goc_deu": PTL_GOC_DEU, "nien_kim": PTL_NIEN_KIM, "goc_cuoi_ky": PTL_GOC_CUOI,
+         "goc_dinh_ky": PTL_GOC_DINH_KY}
+GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
+
+PROMPT_DOC_DE = """Bạn là trợ lý môn Thẩm định tín dụng. Đọc đề bài (chữ và/hoặc ảnh) về lập bảng kế hoạch trả nợ
+và trích các thông số. CHỈ trả về một đối tượng JSON, không giải thích, theo đúng các khóa sau
+(khóa nào đề không cho thì để null):
+{
+  "so_tien_trieu": số tiền vay quy ra TRIỆU đồng (1 tỷ = 1000),
+  "thoi_han": số nguyên,
+  "don_vi_thoi_han": "năm" hoặc "tháng",
+  "ngay_giai_ngan": "dd/mm/yyyy",
+  "ngay_tinh_lai": ngày tính lãi (chốt lãi) hằng tháng, số nguyên 1-31,
+  "ngay_thu_no": ngày thu nợ / thu lãi hằng tháng, số nguyên 1-31,
+  "phuong_thuc": một trong "goc_deu" | "nien_kim" | "goc_cuoi_ky" | "goc_dinh_ky",
+  "chu_ky_goc_thang": số tháng giữa 2 lần trả gốc (chỉ dùng khi goc_dinh_ky, VD theo quý = 3),
+  "giai_doan_lai_suat": [{"tu_ky": số nguyên, "lai_suat_co_so": %/năm, "bien_do": %/năm, "ghi_chu": "..."}],
+  "so_ky_hien_thi": số kỳ đề yêu cầu lập bảng (VD "5 kỳ đầu tiên" = 5),
+  "so_ngay_trong_nam": 365 hoặc 360,
+  "ghi_chu": ["các giả định hoặc điểm chưa rõ trong đề"]
+}
+Quy tắc:
+- "Ngân hàng thu lãi ngày X" là ngay_thu_no; "ngân hàng tính lãi ngày Y" là ngay_tinh_lai. Nếu đề chỉ cho một ngày
+  thì dùng ngày đó cho cả hai.
+- Lãi suất "cố định N tháng đầu" => giai đoạn {"tu_ky":1, "lai_suat_co_so": lãi suất đó, "bien_do":0}.
+  "Tháng thứ N+1 trở đi bằng lãi suất huy động + biên độ b%, biết lãi suất huy động là h%" =>
+  {"tu_ky": N+1, "lai_suat_co_so": h, "bien_do": b}. Chỉ một mức lãi suất => một giai đoạn tu_ky = 1.
+- Lãi suất cho theo %/tháng thì nhân 12 để ra %/năm.
+- "Hằng tháng thu tiền lãi và một phần nợ gốc", "trả góp", "gốc đều", "dư nợ giảm dần" => "goc_deu".
+  Chỉ chọn "nien_kim" khi đề nói số tiền trả mỗi kỳ bằng nhau / niên kim / trả đều cả gốc và lãi.
+  "Trả lãi hằng tháng, gốc trả một lần cuối kỳ" => "goc_cuoi_ky". Gốc trả theo quý/6 tháng => "goc_dinh_ky".
+- Mặc định so_ngay_trong_nam = 365 nếu đề không nói.
+"""
+
+
+def _so(s: str) -> float:
+    s = s.strip()
+    if re.fullmatch(r"\d{1,3}(\.\d{3})+", s):  # 1.200 → 1200
+        return float(s.replace(".", ""))
+    return float(s.replace(",", "."))
+
+
+def doc_de_quy_tac(text: str) -> dict:
+    """Nhận diện thông số theo mẫu câu quen thuộc (dự phòng khi không dùng được AI)."""
+    t = re.sub(r"\s+", " ", unicodedata.normalize("NFC", text).lower())
+    N = r"(\d[\d.,]*)"
+    kq, ghi_chu = {}, []
+
+    if m := re.search(rf"vay\s*(?:số tiền\s*)?{N}\s*(tỷ|tỉ|triệu|tr\b|đồng|đ\b|vnd)", t):
+        v, dv = _so(m.group(1)), m.group(2)
+        kq["so_tien_trieu"] = v * 1000 if dv in ("tỷ", "tỉ") else v / 1e6 if dv in ("đồng", "đ", "vnd") else v
+    if m := re.search(r"(?:vay|thời hạn(?: vay)?|kỳ hạn|trong)\s*(?:là|:)?\s*(\d+)\s*(năm|tháng)(?!\s*(?:đầu|sau|tiếp))", t):
+        kq["thoi_han"], kq["don_vi_thoi_han"] = int(m.group(1)), m.group(2)
+    if m := re.search(r"giải ngân[^0-9]{0,25}(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})", t):
+        y = int(m.group(3))
+        kq["ngay_giai_ngan"] = f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{y + 2000 if y < 100 else y}"
+    if m := re.search(r"thu\s*(?:tiền\s*)?(?:lãi|nợ|tiền)[^0-9]{0,25}ngày\s*(\d{1,2})", t):
+        kq["ngay_thu_no"] = int(m.group(1))
+    if m := re.search(r"tính\s*lãi[^0-9]{0,25}ngày\s*(\d{1,2})", t):
+        kq["ngay_tinh_lai"] = int(m.group(1))
+    if "ngay_thu_no" in kq and "ngay_tinh_lai" not in kq:
+        kq["ngay_tinh_lai"] = kq["ngay_thu_no"]
+        ghi_chu.append("Đề không nói ngày tính lãi, lấy bằng ngày thu nợ.")
+
+    def ls_nam(so, dv):
+        return round(_so(so) * (12 if dv and "tháng" in dv else 1), 6)
+
+    LS = rf"{N}\s*%\s*(/\s*(?:năm|tháng))?"
+    giai_doan = []
+    m_cd = re.search(rf"lãi suất(?: cho vay)?\s*(?:là\s*)?{LS}[^.;]{{0,15}}?cố định\s*(\d+)\s*(tháng|năm)", t)
+    if m_cd:
+        so_thang = int(m_cd.group(3)) * (12 if m_cd.group(4) == "năm" else 1)
+        giai_doan.append({"tu_ky": 1, "lai_suat_co_so": ls_nam(m_cd.group(1), m_cd.group(2)), "bien_do": 0.0,
+                          "ghi_chu": f"Cố định {so_thang} tháng đầu"})
+        tu = so_thang + 1
+        if m := re.search(r"(?:tháng|kỳ) thứ\s*(\d+)\s*trở đi", t):
+            tu = int(m.group(1))
+        m_bd = re.search(rf"biên độ\s*(?:là\s*)?{LS}", t)
+        m_hd = re.search(rf"lãi suất huy động\s*(?:là|=|:)?\s*{LS}", t)
+        if m_bd and m_hd:
+            giai_doan.append({"tu_ky": tu, "lai_suat_co_so": ls_nam(m_hd.group(1), m_hd.group(2)),
+                              "bien_do": ls_nam(m_bd.group(1), m_bd.group(2)), "ghi_chu": "LS huy động + biên độ"})
+        elif m := re.search(rf"(?:tháng|kỳ) thứ\s*\d+\s*trở đi[^%]{{0,40}}?{LS}", t):
+            giai_doan.append({"tu_ky": tu, "lai_suat_co_so": ls_nam(m.group(1), m.group(2)), "bien_do": 0.0,
+                              "ghi_chu": ""})
+        else:
+            ghi_chu.append("Không tìm thấy lãi suất sau giai đoạn cố định.")
+    elif m := re.search(rf"lãi suất(?: cho vay)?\s*(?:là\s*)?{LS}", t):
+        giai_doan.append({"tu_ky": 1, "lai_suat_co_so": ls_nam(m.group(1), m.group(2)), "bien_do": 0.0,
+                          "ghi_chu": ""})
+    if giai_doan:
+        kq["giai_doan_lai_suat"] = giai_doan
+
+    if re.search(r"niên kim|bằng nhau|trả đều cả gốc", t):
+        kq["phuong_thuc"] = "nien_kim"
+    elif re.search(r"gốc[^.]{0,30}(?:cuối kỳ|một lần|khi đáo hạn)", t):
+        kq["phuong_thuc"] = "goc_cuoi_ky"
+    elif m := re.search(r"gốc[^.]{0,30}(?:theo quý|mỗi\s*(\d+)\s*tháng|(\d+)\s*tháng một lần|nửa năm)", t):
+        kq["phuong_thuc"] = "goc_dinh_ky"
+        kq["chu_ky_goc_thang"] = int(m.group(1) or m.group(2) or (6 if "nửa năm" in m.group(0) else 3))
+    elif re.search(r"một phần (?:nợ )?gốc|trả góp|gốc đều|dư nợ giảm dần", t):
+        kq["phuong_thuc"] = "goc_deu"
+    if m := re.search(r"(\d+)\s*kỳ đầu", t):
+        kq["so_ky_hien_thi"] = int(m.group(1))
+    if "360 ngày" in t:
+        kq["so_ngay_trong_nam"] = 360
+    kq["ghi_chu"] = ghi_chu
+    return kq
+
+
+def lay_gemini_key() -> str:
+    try:
+        k = st.secrets.get("GEMINI_API_KEY", "")
+    except Exception:  # chưa có file secrets
+        k = ""
+    return k or st.session_state.get("lt_key", "")
+
+
+def doc_de_gemini(text: str, anh: list, key: str) -> tuple[dict, str]:
+    parts = [{"text": PROMPT_DOC_DE + "\n\nĐỀ BÀI:\n" + (text.strip() or "(xem ảnh đính kèm)")}]
+    for f in anh:
+        parts.append({"inlineData": {"mimeType": f.type or "image/png",
+                                      "data": base64.b64encode(f.getvalue()).decode()}})
+    body = {"contents": [{"parts": parts}],
+            "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}}
+    try:
+        models = [st.secrets.get("GEMINI_MODEL")] if st.secrets.get("GEMINI_MODEL") else GEMINI_MODELS
+    except Exception:
+        models = GEMINI_MODELS
+    loi = ""
+    for model in models:
+        r = requests.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=body, timeout=60)
+        if r.status_code == 404:  # model không tồn tại / đã ngừng → thử model tiếp theo
+            loi = f"Không tìm thấy model {model}"
+            continue
+        if r.status_code != 200:
+            try:
+                msg = r.json()["error"]["message"]
+            except Exception:
+                msg = r.text[:200]
+            raise RuntimeError(f"Gemini báo lỗi {r.status_code}: {msg}")
+        out = "".join(p.get("text", "") for p in r.json()["candidates"][0]["content"]["parts"])
+        out = re.sub(r"^```(?:json)?|```$", "", out.strip()).strip()
+        return json.loads(out), model
+    raise RuntimeError(loi or "Không gọi được Gemini.")
+
+
+def ap_dung_thong_so(kq: dict) -> list:
+    """Ghi thông số đọc được vào các ô nhập. Trả về danh sách những gì đã điền."""
+    ss, da_dien = st.session_state, []
+
+    def dat(khoa, gt, nhan):
+        ss[khoa] = gt
+        da_dien.append(nhan)
+
+    try:
+        if kq.get("so_tien_trieu"):
+            v = float(kq["so_tien_trieu"])
+            dat("lt_stv", v, f"vay {so_vn(v)} triệu")
+        if kq.get("thoi_han"):
+            dv = "tháng" if str(kq.get("don_vi_thoi_han", "")).startswith("th") else "năm"
+            dat("lt_han", int(kq["thoi_han"]), f"{int(kq['thoi_han'])} {dv}")
+            ss["lt_dv"] = dv
+        if kq.get("ngay_giai_ngan"):
+            d = datetime.strptime(str(kq["ngay_giai_ngan"]).strip(), "%d/%m/%Y").date()
+            dat("lt_gn", d, f"giải ngân {d:%d/%m/%Y}")
+        for khoa, src, nhan in [("lt_ngay_lai", "ngay_tinh_lai", "tính lãi ngày"),
+                                ("lt_ngay_thu", "ngay_thu_no", "thu nợ ngày")]:
+            if kq.get(src) and 1 <= int(kq[src]) <= 31:
+                dat(khoa, int(kq[src]), f"{nhan} {int(kq[src])}")
+        if kq.get("phuong_thuc") in MA_PT:
+            dat("lt_pt", MA_PT[kq["phuong_thuc"]], MA_PT[kq["phuong_thuc"]].lower())
+            if kq["phuong_thuc"] == "goc_dinh_ky" and kq.get("chu_ky_goc_thang"):
+                ss["lt_chu_ky"] = int(kq["chu_ky_goc_thang"])
+        if kq.get("so_ky_hien_thi"):
+            dat("lt_so_ky", int(kq["so_ky_hien_thi"]), f"lập {int(kq['so_ky_hien_thi'])} kỳ")
+            ss["lt_tat_ca"] = False
+        if kq.get("so_ngay_trong_nam") in (360, 365):
+            ss["lt_coso"] = int(kq["so_ngay_trong_nam"])
+        gd = [g for g in (kq.get("giai_doan_lai_suat") or []) if g and g.get("lai_suat_co_so") is not None]
+        if gd:
+            df = pd.DataFrame([[int(g.get("tu_ky") or 1), float(g["lai_suat_co_so"]), float(g.get("bien_do") or 0),
+                                str(g.get("ghi_chu") or "")] for g in gd], columns=COT_LS)
+            ss["lt_ls_df"] = df.astype({"Từ kỳ": "int64", COT_LS[1]: "float64", COT_LS[2]: "float64"})
+            ss["lt_ls_ver"] = ss.get("lt_ls_ver", 0) + 1
+            da_dien.append("lãi suất " + " → ".join(
+                f"{so_vn(float(g['lai_suat_co_so']) + float(g.get('bien_do') or 0))}% từ kỳ {int(g.get('tu_ky') or 1)}"
+                for g in gd))
+    except (TypeError, ValueError) as e:
+        da_dien.append(f"(bỏ qua một giá trị không hợp lệ: {e})")
+    return da_dien
+
+
+def chen_de_mau():
+    if st.session_state.get("lt_de_mau") in DE_MAU:
+        st.session_state["lt_de"] = DE_MAU[st.session_state["lt_de_mau"]]
+
+
+def khu_vuc_nhap_de():
+    html('<div class="sec">📝 Gửi đề bài <small>— dán chữ và/hoặc tải ảnh chụp đề, app tự điền thông số và lập bảng</small></div>')
+    st.selectbox("Chèn đề mẫu (tuỳ chọn)", ["—"] + list(DE_MAU), key="lt_de_mau", on_change=chen_de_mau)
+    st.text_area("Nội dung đề bài", key="lt_de", height=150,
+                 placeholder="VD: Khách hàng vay 700 triệu, vay 5 năm, lãi suất cho vay 9%/năm cố định 3 tháng đầu...")
+    st.file_uploader("Ảnh chụp đề (PNG/JPG, có thể chọn nhiều ảnh)", type=["png", "jpg", "jpeg", "webp"],
+                     accept_multiple_files=True, key="lt_anh")
+    co_key = bool(lay_gemini_key())
+    if not co_key:
+        with st.expander("🔑 Chưa có Gemini API key — bấm để nhập tạm"):
+            st.text_input("Gemini API key", type="password", key="lt_key",
+                          help="Chỉ lưu trong phiên làm việc này. Nên cài cố định trong Settings → Secrets "
+                               "của Streamlit Cloud với tên GEMINI_API_KEY.")
+            st.caption("Không có key: đề dán chữ vẫn được đọc bằng quy tắc; ảnh chụp thì cần key.")
+
+    if st.button("🤖  Đọc đề & lập bảng", type="primary", width="stretch"):
+        xu_ly_de()
+    tb = st.session_state.get("lt_thong_bao")
+    if tb:
+        nguon, da_dien, canh_bao = tb
+        if da_dien:
+            st.success(f"Đã đọc đề bằng {nguon}: " + "; ".join(da_dien) + ". Bảng trả nợ ở bên dưới.")
+        else:
+            st.error(f"Không nhận diện được thông số nào ({nguon}). Hãy kiểm tra đề hoặc nhập tay.")
+        for c in canh_bao:
+            st.warning(c)
+
+
+def xu_ly_de():
+    text, anh = st.session_state.get("lt_de", ""), st.session_state.get("lt_anh") or []
+    if not text.strip() and not anh:
+        st.session_state["lt_thong_bao"] = ("", [], ["Hãy dán nội dung đề hoặc tải ảnh chụp đề."])
+        return
+
+    key, kq, nguon, canh_bao = lay_gemini_key(), None, "", []
+    if key:
+        with st.spinner("Gemini đang đọc đề..."):
+            try:
+                kq, model = doc_de_gemini(text, anh, key)
+                nguon = f"AI Gemini ({model})"
+            except Exception as e:  # noqa: BLE001
+                canh_bao.append(f"Không dùng được Gemini: {e}")
+    if kq is None:
+        if not text.strip():
+            st.session_state["lt_thong_bao"] = ("", [], ["Ảnh chụp đề cần Gemini API key để đọc."] + canh_bao)
+            return
+        kq, nguon = doc_de_quy_tac(text), "quy tắc nhận diện mẫu câu"
+    canh_bao += [str(c) for c in (kq.get("ghi_chu") or []) if c]
+    da_dien = ap_dung_thong_so(kq)
+    st.session_state["lt_da_lap"] = True
+    st.session_state["lt_thong_bao"] = (nguon, da_dien, canh_bao)
+
+
 def trang_lich_tra_no():
     if "lt_stv" not in st.session_state:
         st.session_state["lt_mau"] = next(iter(MAU_DE_BAI))
         ap_dung_mau()
         st.session_state["lt_chu_ky"] = 3
 
-    st.selectbox(
-        "📚 Nạp dữ liệu đề bài mẫu", list(MAU_DE_BAI) + ["Tự nhập"], key="lt_mau", on_change=ap_dung_mau,
-        help="Chọn đề bài mẫu để điền sẵn số liệu, sau đó có thể sửa bất kỳ ô nào.",
-    )
+    khu_vuc_nhap_de()
+    st.write("")
+    html('<div class="sec">✏️ Thông số khoản vay <small>— tự điền khi đọc đề, có thể sửa tay rồi bấm Lập bảng</small></div>')
 
     with st.form("lich_tra_no"):
         html('<div class="sec">💳 Khoản vay</div>')
@@ -356,12 +629,13 @@ def trang_lich_tra_no():
             q2.number_input("Số kỳ hiển thị", 1, 600, step=1, key="lt_so_ky")
             st.checkbox("Hiển thị toàn bộ các kỳ", key="lt_tat_ca")
 
-        bam = st.form_submit_button("📅  Lập bảng kế hoạch trả nợ", type="primary", width="stretch")
+        bam = st.form_submit_button("📅  Lập bảng kế hoạch trả nợ", type="primary", width="stretch",
+                                    on_click=lambda: st.session_state.pop("lt_thong_bao", None))
 
     if bam:
         st.session_state["lt_da_lap"] = True
     if not st.session_state.get("lt_da_lap"):
-        html('<div class="hint">📝 Nhập thông tin khoản vay (hoặc chọn đề bài mẫu), '
+        html('<div class="hint">📝 Gửi đề bài rồi bấm <b>Đọc đề &amp; lập bảng</b>, hoặc nhập tay thông số '
              'sau đó bấm <b>Lập bảng kế hoạch trả nợ</b>.</div>')
         return
 
