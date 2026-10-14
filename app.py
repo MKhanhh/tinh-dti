@@ -1,7 +1,7 @@
 import streamlit as st
 
 # ================== CẤU HÌNH TRANG ==================
-st.set_page_config(page_title="Tính chỉ số DTI", page_icon="💰", layout="centered")
+st.set_page_config(page_title="Phần mềm thẩm định tín dụng_Nguyễn Viết Minh Khánh", page_icon="💰", layout="centered")
 
 NGUONG_DTI = 0.7  # Ngưỡng 70%
 
@@ -12,7 +12,7 @@ def vnd(x: float) -> str:
 
 
 # ================== GIAO DIỆN ==================
-st.title("💰 Tính chỉ số DTI")
+st.title("💰 Phần mềm thẩm định tín dụng_Nguyễn Viết Minh Khánh")
 st.caption(
     "DTI = (Tiền gốc + lãi phải trả hàng tháng + Nợ cũ) / "
     "(Thu nhập − Chi phí sinh hoạt × Số người)"
