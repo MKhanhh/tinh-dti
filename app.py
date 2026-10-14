@@ -3,16 +3,102 @@ import math
 import pandas as pd
 import streamlit as st
 
-# ================== CẤU HÌNH TRANG ==================
-st.set_page_config(page_title="Thẩm định tín dụng - DTI", page_icon="💰", layout="centered")
+# =====================================================================
+# CẤU HÌNH
+# =====================================================================
+st.set_page_config(page_title="Thẩm định tín dụng", page_icon="🏦", layout="centered")
 
-PT_GOC_DEU = "Gốc đều + lãi trên số tiền vay (công thức gốc)"
+TIEU_DE = "Phần mềm thẩm định tín dụng_Nguyễn Viết Minh Khánh"
+TRIEU = 1_000_000
+PT_GOC_DEU = "Gốc đều + lãi tính trên số tiền vay"
 PT_TRA_DEU = "Trả góp đều hàng tháng (niên kim)"
 
+# =====================================================================
+# GIAO DIỆN (CSS)
+# =====================================================================
+st.markdown(
+    """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+.stApp, .stApp p, .stApp label, .stApp input, .stApp textarea, .stApp h1, .stApp h2, .stApp h3,
+.stApp h4, .stApp li, .stApp button p, .stApp td, .stApp th {font-family:'Be Vietnam Pro',sans-serif !important;}
+.stApp {background:#F4F6FB;}
+header[data-testid="stHeader"] {background:transparent;}
+.block-container {padding-top:2rem; padding-bottom:3rem; max-width:860px;}
 
+.hero {background:linear-gradient(135deg,#0B3C74 0%,#1565C0 60%,#1E88E5 100%); border-radius:18px;
+       padding:26px 28px; color:#fff; box-shadow:0 10px 30px rgba(11,60,116,.25); margin-bottom:18px;}
+.hero-badge {display:inline-block; background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.25);
+       padding:4px 12px; border-radius:999px; font-size:.75rem; letter-spacing:.08em; font-weight:600;}
+.hero-title {font-size:1.65rem; font-weight:800; line-height:1.3; margin:12px 0 6px;}
+.hero-sub {opacity:.85; font-size:.95rem;}
+
+.sec {font-weight:700; color:#0B3C74; font-size:1.02rem; margin:4px 0 2px; display:flex; gap:8px; align-items:center;}
+.sec small {font-weight:500; color:#6B7280; font-size:.8rem;}
+
+div[data-testid="stForm"] {background:#fff; border:1px solid #E5E9F2; border-radius:16px;
+       padding:20px 22px; box-shadow:0 4px 16px rgba(15,23,42,.05);}
+
+.result {border-radius:16px; padding:20px 24px; display:flex; justify-content:space-between; align-items:center;
+       gap:16px; flex-wrap:wrap; color:#fff; margin:6px 0 14px;}
+.result.ok {background:linear-gradient(135deg,#0F9D58,#16A34A);}
+.result.fail {background:linear-gradient(135deg,#C62828,#E53935);}
+.r-label {font-size:.82rem; opacity:.9; text-transform:uppercase; letter-spacing:.06em;}
+.r-value {font-size:2.6rem; font-weight:800; line-height:1.1;}
+.r-status {font-size:1.25rem; font-weight:800; text-align:right;}
+.r-sub {font-size:.88rem; opacity:.9; text-align:right;}
+
+.gauge {background:#fff; border:1px solid #E5E9F2; border-radius:14px; padding:16px 18px 10px; margin-bottom:14px;}
+.g-head {display:flex; justify-content:space-between; font-size:.85rem; color:#475569; margin-bottom:10px;}
+.g-track {position:relative; height:14px; border-radius:999px;
+       background:linear-gradient(90deg,#DCFCE7 0%,#DCFCE7 var(--a),#FEF3C7 var(--a),#FEF3C7 var(--t),#FEE2E2 var(--t),#FEE2E2 100%);}
+.g-fill {position:absolute; left:0; top:0; height:100%; border-radius:999px;}
+.g-thr {position:absolute; top:-6px; width:2px; height:26px; background:#0F172A;}
+.g-thr span {position:absolute; top:-20px; left:50%; transform:translateX(-50%); font-size:.72rem;
+       font-weight:700; color:#0F172A; white-space:nowrap;}
+.g-scale {display:flex; justify-content:space-between; font-size:.72rem; color:#94A3B8; margin-top:6px;}
+
+.kpis {display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:8px;}
+.kpi {background:#fff; border:1px solid #E5E9F2; border-radius:14px; padding:14px 16px;}
+.kpi-l {font-size:.78rem; color:#64748B;}
+.kpi-v {font-size:1.15rem; font-weight:700; color:#0F172A; margin-top:2px;}
+.kpi-s {font-size:.75rem; margin-top:2px;}
+@media (max-width:640px){ .kpis{grid-template-columns:1fr;} .r-status,.r-sub{text-align:left;} }
+
+.sol {background:#fff; border:1px solid #E5E9F2; border-radius:14px; padding:16px 18px; margin-bottom:12px;
+       border-left:5px solid #CBD5E1; min-height:190px;}
+.sol.ok {border-left-color:#16A34A;} .sol.warn {border-left-color:#F59E0B;} .sol.na {border-left-color:#94A3B8;}
+.sol-h {display:flex; justify-content:space-between; align-items:center; gap:8px;}
+.sol-t {font-weight:700; color:#0F172A;}
+.badge {font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap;}
+.b-ok {background:#DCFCE7; color:#166534;} .b-warn {background:#FEF3C7; color:#92400E;} .b-na {background:#F1F5F9; color:#475569;}
+.sol-v {font-size:1.25rem; font-weight:800; color:#0B3C74; margin:8px 0 2px;}
+.sol-d {font-size:.86rem; color:#334155;}
+.sol-tip {font-size:.8rem; color:#64748B; margin-top:8px; padding-top:8px; border-top:1px dashed #E2E8F0;}
+
+.hint {background:#fff; border:1px dashed #CBD5E1; border-radius:14px; padding:22px; text-align:center; color:#64748B;}
+.plan {background:#EFF6FF; border:1px solid #BFDBFE; border-radius:14px; padding:14px 16px; color:#1E3A8A; font-size:.92rem;}
+.foot {text-align:center; color:#94A3B8; font-size:.78rem; margin-top:28px;}
+button[data-baseweb="tab"] p {font-weight:600;}
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# =====================================================================
+# HÀM TÍNH TOÁN
+# =====================================================================
 def vnd(x: float) -> str:
-    """Định dạng số tiền kiểu Việt Nam: 1.000.000 đ"""
     return f"{x:,.0f} đ".replace(",", ".")
+
+
+def trieu(x: float) -> str:
+    """Hiển thị gọn theo triệu đồng."""
+    v = round(x / TRIEU, 2)
+    nguyen, le = f"{v:,.2f}".split(".")
+    le = le.rstrip("0")
+    return nguyen.replace(",", ".") + ("," + le if le else "") + " triệu"
 
 
 def pct(x) -> str:
@@ -20,388 +106,335 @@ def pct(x) -> str:
 
 
 def tra_hang_thang(stv, nam, LS, pt):
-    """Số tiền phải trả mỗi tháng cho khoản vay mới."""
     if stv <= 0:
         return 0.0
-    so_thang = nam * 12
-    r = LS / 12
-    if pt == PT_TRA_DEU and r > 0:
-        return stv * r / (1 - (1 + r) ** (-so_thang))
+    n, r = nam * 12, LS / 12
     if pt == PT_TRA_DEU:
-        return stv / so_thang
-    return stv / so_thang + stv * r
+        return stv * r / (1 - (1 + r) ** (-n)) if r > 0 else stv / n
+    return stv / n + stv * r
 
 
 def tinh_dti(stv, nam, LS, nc, tn, cpsh, sn, pt):
-    """Trả về DTI (số thập phân) hoặc None nếu thu nhập còn lại <= 0."""
     con_lai = tn - cpsh * sn
     if con_lai <= 0:
         return None
     return (tra_hang_thang(stv, nam, LS, pt) + nc) / con_lai
 
 
-# ================== GIAO DIỆN ==================
-st.title("💰 Phần mềm thẩm định tín dụng_Nguyễn Viết Minh Khánh")
+def html(s: str):
+    st.markdown(s, unsafe_allow_html=True)
 
-with st.expander("⚙️ Tham số ngân hàng (bấm để thay đổi)"):
-    b1, b2 = st.columns(2)
-    nguong_pct = b1.number_input(
-        "Ngưỡng DTI tối đa (%)", min_value=10.0, max_value=100.0, value=70.0, step=1.0, format="%.1f",
-        help="Khách hàng được vay khi DTI nhỏ hơn ngưỡng này.",
+
+# =====================================================================
+# HEADER
+# =====================================================================
+html(
+    f'<div class="hero"><span class="hero-badge">THẨM ĐỊNH TÍN DỤNG · CHỈ SỐ DTI</span>'
+    f'<div class="hero-title">🏦 {TIEU_DE}</div>'
+    f'<div class="hero-sub">Đánh giá khả năng trả nợ của khách hàng và đề xuất giải pháp để đủ điều kiện vay</div></div>'
+)
+
+with st.expander("⚙️ Cài đặt chính sách ngân hàng"):
+    a1, a2, a3 = st.columns(3)
+    nguong_pct = a1.number_input("Ngưỡng DTI tối đa (%)", 10.0, 100.0, 70.0, 1.0, format="%.0f")
+    muc_tieu = a2.number_input(
+        "DTI mục tiêu khi tư vấn (%)", 1.0, nguong_pct, nguong_pct, 1.0, format="%.0f",
+        help="Giải pháp sẽ đưa DTI xuống dưới mức này.",
     )
-    THOI_HAN_TOI_DA = b2.number_input(
-        "Thời hạn vay tối đa (năm)", min_value=1, max_value=50, value=20, step=1,
-    )
-    PT = st.radio(
-        "Phương thức tính tiền trả nợ hàng tháng",
-        [PT_GOC_DEU, PT_TRA_DEU],
-        help=(
-            "Gốc đều: gốc = số tiền vay / số tháng; lãi = số tiền vay × lãi suất / 12.\n\n"
-            "Trả góp đều: mỗi tháng trả một số tiền cố định (gồm cả gốc và lãi)."
-        ),
-    )
-NGUONG_DTI = nguong_pct / 100
+    THOI_HAN_TOI_DA = a3.number_input("Thời hạn vay tối đa (năm)", 1, 50, 20, 1)
+    PT = st.radio("Phương thức trả nợ", [PT_GOC_DEU, PT_TRA_DEU], horizontal=True)
+NGUONG = nguong_pct / 100
 
-if PT == PT_GOC_DEU:
-    st.caption(
-        "DTI = (Tiền gốc + lãi phải trả hàng tháng + Nợ cũ) / "
-        "(Thu nhập − Chi phí sinh hoạt × Số người)"
-    )
-else:
-    st.caption(
-        "DTI = (Khoản trả góp đều hàng tháng + Nợ cũ) / "
-        "(Thu nhập − Chi phí sinh hoạt × Số người)"
-    )
+# =====================================================================
+# FORM NHẬP LIỆU
+# =====================================================================
+with st.form("ho_so"):
+    html('<div class="sec">👤 Thông tin khách hàng</div>')
+    ten_kh = st.text_input("Họ tên khách hàng", placeholder="VD: Nguyễn Văn A")
+    c1, c2 = st.columns(2)
+    tn_tr = c1.number_input("Thu nhập hàng tháng (triệu đ)", 0.0, value=45.0, step=1.0, format="%.1f")
+    nc_tr = c2.number_input("Nợ cũ phải trả / tháng (triệu đ)", 0.0, value=10.0, step=0.5, format="%.1f")
+    sn = c1.number_input("Số người trong gia đình", 1, value=3, step=1)
+    cpsh_tr = c2.number_input("Chi phí sinh hoạt / người / tháng (triệu đ)", 0.0, value=4.0, step=0.5, format="%.1f")
 
-with st.form("dti_form"):
-    ten_kh = st.text_input("Tên khách hàng", placeholder="VD: Nguyễn Văn A")
-    col1, col2 = st.columns(2)
+    st.write("")
+    html('<div class="sec">💳 Khoản vay đề nghị</div>')
+    d1, d2, d3 = st.columns(3)
+    stv_tr = d1.number_input("Số tiền vay (triệu đ)", 0.0, value=800.0, step=10.0, format="%.0f")
+    thv = d2.number_input("Thời hạn vay (năm)", 1, 50, 5, 1)
+    ls = d3.number_input("Lãi suất (%/năm)", 0.0, value=12.0, step=0.1, format="%.2f")
 
-    with col1:
-        stv = st.number_input(
-            "Số tiền vay (VNĐ)",
-            min_value=0, value=800_000_000, step=10_000_000, format="%d",
-        )
-        thv = st.number_input(
-            "Thời hạn vay (năm)",
-            min_value=1, max_value=50, value=5, step=1,
-        )
-        ls = st.number_input(
-            "Lãi suất vay (%/năm)",
-            min_value=0.0, value=12.0, step=0.1, format="%.2f",
-        )
-        sn = st.number_input(
-            "Số người trong gia đình",
-            min_value=1, value=3, step=1,
-        )
-
-    with col2:
-        tn = st.number_input(
-            "Thu nhập hàng tháng (VNĐ)",
-            min_value=0, value=45_000_000, step=1_000_000, format="%d",
-        )
-        nc = st.number_input(
-            "Nợ cũ phải trả hàng tháng (VNĐ)",
-            min_value=0, value=10_000_000, step=1_000_000, format="%d",
-        )
-        cpsh = st.number_input(
-            "Chi phí sinh hoạt / người / tháng (VNĐ)",
-            min_value=0, value=4_000_000, step=500_000, format="%d",
-        )
-        muc_tieu = st.number_input(
-            "DTI mục tiêu khi tư vấn (%)",
-            min_value=1.0, max_value=nguong_pct, value=nguong_pct, step=1.0,
-            format="%.1f",
-            help="Các giải pháp sẽ đưa DTI xuống dưới mức này (không vượt ngưỡng ngân hàng).",
-        )
-
-    submitted = st.form_submit_button("📊 Tính DTI")
+    submitted = st.form_submit_button("🔍  Thẩm định hồ sơ", type="primary", width="stretch")
 
 if submitted:
     st.session_state["da_tinh"] = True
-    st.session_state["lan_tinh"] = st.session_state.get("lan_tinh", 0) + 1
+    st.session_state["lan"] = st.session_state.get("lan", 0) + 1
 
-# ================== TÍNH TOÁN ==================
-if st.session_state.get("da_tinh"):
-    LS = ls / 100  # đổi % sang số thập phân
-    ten_hien_thi = ten_kh.strip() or "(chưa nhập tên)"
+if not st.session_state.get("da_tinh"):
+    html('<div class="hint">📝 Nhập thông tin khách hàng và khoản vay, sau đó bấm <b>Thẩm định hồ sơ</b>.</div>')
+    html('<div class="foot">© 2026 · Nguyễn Viết Minh Khánh · Công cụ hỗ trợ học tập, kết quả mang tính tham khảo</div>')
+    st.stop()
 
-    tra_khoan_moi = tra_hang_thang(stv, thv, LS, PT)  # khoản vay mới mỗi tháng
-    tra_lai = stv * LS / 12                            # lãi tháng đầu
-    tra_goc = tra_khoan_moi - tra_lai                  # gốc tháng đầu
-    tong_no = tra_khoan_moi + nc                       # tổng nợ phải trả mỗi tháng
-    chi_phi_sh = cpsh * sn
-    thu_nhap_con_lai = tn - chi_phi_sh                 # thu nhập sau chi phí sinh hoạt
+# =====================================================================
+# TÍNH TOÁN
+# =====================================================================
+stv, tn, nc, cpsh = stv_tr * TRIEU, tn_tr * TRIEU, nc_tr * TRIEU, cpsh_tr * TRIEU
+LS = ls / 100
+ten = ten_kh.strip() or "Khách hàng"
 
-    st.divider()
-    st.subheader(f"Kết quả thẩm định — Khách hàng: {ten_hien_thi}")
+tra_moi = tra_hang_thang(stv, thv, LS, PT)
+lai_1 = stv * LS / 12
+goc_1 = tra_moi - lai_1
+tong_no = tra_moi + nc
+chi_phi = cpsh * sn
+con_lai = tn - chi_phi
+DTI = tong_no / con_lai if con_lai > 0 else None
+DAT = DTI is not None and DTI < NGUONG and thv <= THOI_HAN_TOI_DA
 
-    if thv > THOI_HAN_TOI_DA:
-        st.warning(f"⚠️ Thời hạn vay {thv} năm vượt mức tối đa {THOI_HAN_TOI_DA} năm của ngân hàng.")
+# =====================================================================
+# KẾT QUẢ
+# =====================================================================
+st.write("")
+html(f'<div class="sec">📊 Kết quả thẩm định <small>— {ten}</small></div>')
 
-    DTI = None
-    if thu_nhap_con_lai <= 0:
-        st.error(
-            "❌ **KHÔNG ĐƯỢC VAY** — Thu nhập không đủ trang trải chi phí sinh hoạt "
-            f"(còn lại {vnd(thu_nhap_con_lai)}), không thể tính DTI."
-        )
-    else:
-        DTI = tong_no / thu_nhap_con_lai
-
-        c1, c2 = st.columns(2)
-        c1.metric("Chỉ số DTI", f"{DTI * 100:.2f}%")
-        c2.metric("Ngưỡng cho phép", f"< {nguong_pct:g}%")
-
-        if DTI < NGUONG_DTI:
-            st.success(f"✅ **ĐƯỢC VAY** — DTI = {DTI * 100:.2f}% nhỏ hơn {nguong_pct:g}%")
-        else:
-            st.error(f"❌ **KHÔNG ĐƯỢC VAY** — DTI = {DTI * 100:.2f}% từ {nguong_pct:g}% trở lên")
-
-        st.progress(min(DTI, 1.0))
-
-    with st.expander("Xem chi tiết tính toán"):
-        nhan = "hàng tháng" if PT == PT_GOC_DEU else "tháng đầu"
-        st.write(f"- Phương thức: **{PT}**")
-        st.write(f"- Gốc trả {nhan}: **{vnd(tra_goc)}**")
-        st.write(f"- Lãi trả {nhan}: **{vnd(tra_lai)}**")
-        st.write(f"- Khoản vay mới / tháng: **{vnd(tra_khoan_moi)}**")
-        st.write(f"- Nợ cũ / tháng: **{vnd(nc)}**")
-        st.write(f"- **Tổng nợ phải trả / tháng: {vnd(tong_no)}**")
-        st.write(f"- Tổng chi phí sinh hoạt: **{vnd(chi_phi_sh)}**")
-        st.write(f"- **Thu nhập còn lại: {vnd(thu_nhap_con_lai)}**")
-
-    # ================== TƯ VẤN GIẢM DTI ==================
-    # chừa biên 0,05% để kết quả hiển thị luôn dưới mục tiêu
-    T = min(muc_tieu / 100, NGUONG_DTI) - 0.0005
-
-    if DTI is None or DTI >= T:
-        st.divider()
-        st.subheader("💡 Tư vấn giải pháp giảm DTI")
-        st.caption(
-            f"Mục tiêu: đưa DTI xuống dưới **{muc_tieu:.1f}%**. Mỗi giải pháp dưới đây "
-            "chỉ điều chỉnh MỘT yếu tố, các yếu tố khác giữ nguyên. "
-            "Muốn kết hợp nhiều yếu tố, dùng phần **Mô phỏng kết hợp** ở cuối trang."
-        )
-
-        bang = []
-        khong_ap_dung = "Không áp dụng được — thu nhập còn lại ≤ 0, cần tăng thu nhập trước."
-
-        # ---------- 1. Giảm số tiền vay ----------
-        st.markdown("#### 1️⃣ Giảm số tiền vay")
-        if thu_nhap_con_lai <= 0:
-            st.write(khong_ap_dung)
-            bang.append(["Giảm số tiền vay", "Không áp dụng", "—", "❌"])
-        else:
-            du_dia = T * thu_nhap_con_lai - nc  # số tiền còn trả được cho khoản vay mới / tháng
-            if du_dia <= 0:
-                st.write(
-                    f"Không khả thi — riêng nợ cũ ({vnd(nc)}/tháng) đã vượt mức cho phép, "
-                    "dù vay 0 đồng cũng không đạt."
-                )
-                bang.append(["Giảm số tiền vay", "Không khả thi", "—", "❌"])
-            else:
-                he_so = tra_hang_thang(1, thv, LS, PT)  # tiền trả / tháng cho mỗi 1 đồng vay
-                stv_max = min(stv, math.floor(du_dia / he_so / 1_000_000) * 1_000_000)
-                dti_moi = tinh_dti(stv_max, thv, LS, nc, tn, cpsh, sn, PT)
-                st.write(
-                    f"Vay tối đa **{vnd(stv_max)}** (giảm {vnd(stv - stv_max)} so với đề nghị), "
-                    f"thời hạn giữ nguyên {thv} năm → DTI ≈ **{pct(dti_moi)}**."
-                )
-                st.write(
-                    "👉 Tư vấn: khách hàng bổ sung phần còn thiếu bằng vốn tự có "
-                    "hoặc chọn tài sản/phương án có giá trị thấp hơn."
-                )
-                bang.append(["Giảm số tiền vay", f"Vay tối đa {vnd(stv_max)}", pct(dti_moi), "✅"])
-
-                if thv < THOI_HAN_TOI_DA:
-                    he_so_max = tra_hang_thang(1, THOI_HAN_TOI_DA, LS, PT)
-                    stv_max2 = math.floor(du_dia / he_so_max / 1_000_000) * 1_000_000
-                    st.caption(
-                        f"Nếu đồng thời kéo dài lên {THOI_HAN_TOI_DA} năm thì có thể vay tối đa "
-                        f"{vnd(stv_max2)}."
-                    )
-
-        # ---------- 2. Kéo dài thời hạn vay ----------
-        st.markdown("#### 2️⃣ Kéo dài thời hạn vay")
-        if thu_nhap_con_lai <= 0:
-            st.write(khong_ap_dung)
-            bang.append(["Kéo dài thời hạn", "Không áp dụng", "—", "❌"])
-        elif stv == 0:
-            st.write("Không áp dụng — số tiền vay bằng 0.")
-            bang.append(["Kéo dài thời hạn", "Không áp dụng", "—", "❌"])
-        else:
-            n_min = None
-            for n in range(thv, 101):
-                d = tinh_dti(stv, n, LS, nc, tn, cpsh, sn, PT)
-                if d is not None and d < T:
-                    n_min = n
-                    break
-            if n_min is None:
-                st.write(
-                    "Không khả thi — dù kéo dài rất lâu, tiền lãi và nợ cũ vẫn vượt mức cho phép."
-                )
-                bang.append(["Kéo dài thời hạn", "Không khả thi", "—", "❌"])
-            elif n_min > THOI_HAN_TOI_DA:
-                dti_max = tinh_dti(stv, THOI_HAN_TOI_DA, LS, nc, tn, cpsh, sn, PT)
-                st.write(
-                    f"Cần vay ít nhất **{n_min} năm**, vượt thời hạn tối đa {THOI_HAN_TOI_DA} năm "
-                    f"của ngân hàng. Kéo dài lên {THOI_HAN_TOI_DA} năm thì DTI còn "
-                    f"**{pct(dti_max)}** — chưa đạt, cần kết hợp thêm giải pháp khác."
-                )
-                bang.append([
-                    "Kéo dài thời hạn",
-                    f"Cần {n_min} năm (> {THOI_HAN_TOI_DA} năm)",
-                    f"{pct(dti_max)} (ở {THOI_HAN_TOI_DA} năm)",
-                    "⚠️",
-                ])
-            else:
-                dti_moi = tinh_dti(stv, n_min, LS, nc, tn, cpsh, sn, PT)
-                tra_moi = tra_hang_thang(stv, n_min, LS, PT)
-                st.write(
-                    f"Kéo dài thời hạn từ {thv} lên **{n_min} năm** → khoản trả mới "
-                    f"{vnd(tra_moi)}/tháng, DTI ≈ **{pct(dti_moi)}**."
-                )
-                st.write(
-                    "👉 Tư vấn: số tiền trả hàng tháng giảm nhưng tổng tiền lãi phải trả "
-                    "cả kỳ sẽ tăng; khách hàng có thể trả nợ trước hạn khi có điều kiện."
-                )
-                bang.append(["Kéo dài thời hạn", f"Vay {n_min} năm", pct(dti_moi), "✅"])
-
-        # ---------- 3. Trả bớt nợ cũ ----------
-        st.markdown("#### 3️⃣ Trả bớt nợ cũ")
-        if thu_nhap_con_lai <= 0:
-            st.write(khong_ap_dung)
-            bang.append(["Trả bớt nợ cũ", "Không áp dụng", "—", "❌"])
-        elif nc == 0:
-            st.write("Không áp dụng — khách hàng không có nợ cũ.")
-            bang.append(["Trả bớt nợ cũ", "Không có nợ cũ", "—", "❌"])
-        else:
-            nc_max = T * thu_nhap_con_lai - tra_khoan_moi
-            if nc_max < 0:
-                dti_0 = tinh_dti(stv, thv, LS, 0, tn, cpsh, sn, PT)
-                st.write(
-                    f"Không khả thi — dù tất toán toàn bộ nợ cũ, DTI vẫn còn **{pct(dti_0)}**. "
-                    "Cần kết hợp thêm giải pháp khác."
-                )
-                bang.append(["Trả bớt nợ cũ", "Tất toán hết vẫn chưa đạt", pct(dti_0), "⚠️"])
-            else:
-                nc_max = math.floor(nc_max / 1_000) * 1_000
-                dti_moi = tinh_dti(stv, thv, LS, nc_max, tn, cpsh, sn, PT)
-                st.write(
-                    f"Giảm nợ cũ phải trả từ {vnd(nc)} xuống tối đa **{vnd(nc_max)}/tháng** "
-                    f"(giảm {vnd(nc - nc_max)}/tháng) → DTI ≈ **{pct(dti_moi)}**."
-                )
-                st.write(
-                    "👉 Tư vấn: tất toán trước các khoản vay nhỏ / thẻ tín dụng, "
-                    "hoặc cơ cấu lại nợ cũ để giảm số tiền trả hàng tháng."
-                )
-                bang.append(["Trả bớt nợ cũ", f"Nợ cũ ≤ {vnd(nc_max)}/tháng", pct(dti_moi), "✅"])
-
-        # ---------- 4. Tăng thu nhập / thêm người đồng vay ----------
-        st.markdown("#### 4️⃣ Tăng thu nhập / thêm người đồng vay")
-        tn_min = tong_no / T + chi_phi_sh
-        tn_min = math.ceil(tn_min / 100_000) * 100_000
-        dti_moi = tinh_dti(stv, thv, LS, nc, tn_min, cpsh, sn, PT)
-        st.write(
-            f"Thu nhập hàng tháng cần đạt tối thiểu **{vnd(tn_min)}** "
-            f"(tăng thêm {vnd(tn_min - tn)}/tháng) → DTI ≈ **{pct(dti_moi)}**."
-        )
-        st.write(
-            "👉 Tư vấn: bổ sung người đồng vay (vợ/chồng, người thân) có thu nhập ổn định, "
-            "hoặc chứng minh thêm nguồn thu nhập khác (cho thuê, kinh doanh...)."
-        )
-        bang.append(["Tăng thu nhập", f"Thu nhập ≥ {vnd(tn_min)}", pct(dti_moi), "✅"])
-
-        # ---------- Bảng tóm tắt ----------
-        st.markdown("#### 📋 Tóm tắt các phương án")
-        df = pd.DataFrame(bang, columns=["Giải pháp", "Điều chỉnh", "DTI sau điều chỉnh", "Đạt"])
-        st.dataframe(df, hide_index=True, width="stretch")
-        st.caption("✅ Đạt mục tiêu · ⚠️ Cải thiện nhưng chưa đủ, cần kết hợp · ❌ Không áp dụng/không khả thi")
-
-    # ================== MÔ PHỎNG KẾT HỢP ==================
-    st.divider()
-    st.subheader("🎛️ Mô phỏng kết hợp nhiều giải pháp")
-    st.caption(
-        "Kéo các thanh trượt để điều chỉnh đồng thời nhiều yếu tố cho khách hàng này; "
-        "DTI mới được tính ngay. Bấm lại **Tính DTI** để đặt lại về số liệu ban đầu."
+if DTI is None:
+    html(
+        '<div class="result fail"><div><div class="r-label">Chỉ số DTI</div><div class="r-value">—</div></div>'
+        '<div><div class="r-status">✖ KHÔNG ĐỦ ĐIỀU KIỆN</div>'
+        f'<div class="r-sub">Thu nhập không đủ chi phí sinh hoạt (thiếu {vnd(-con_lai)}/tháng)</div></div></div>'
+    )
+else:
+    cls = "ok" if DAT else "fail"
+    trang_thai = "✔ ĐỦ ĐIỀU KIỆN VAY" if DAT else "✖ KHÔNG ĐỦ ĐIỀU KIỆN"
+    ly_do = f"Ngưỡng ngân hàng: DTI &lt; {nguong_pct:g}%"
+    if DTI < NGUONG and thv > THOI_HAN_TOI_DA:
+        ly_do = f"Thời hạn {thv} năm vượt mức tối đa {THOI_HAN_TOI_DA} năm"
+    html(
+        f'<div class="result {cls}"><div><div class="r-label">Chỉ số DTI</div>'
+        f'<div class="r-value">{DTI * 100:.2f}%</div></div>'
+        f'<div><div class="r-status">{trang_thai}</div><div class="r-sub">{ly_do}</div></div></div>'
     )
 
-    v = st.session_state.get("lan_tinh", 0)  # đổi key mỗi lần Tính DTI để reset thanh trượt
+    # Thanh đo DTI (thang 0 – 120%)
+    THANG = 1.2
+    vi_tri = min(DTI, THANG) / THANG * 100
+    nguong_vt = NGUONG / THANG * 100
+    canh_bao_vt = max(NGUONG - 0.1, 0) / THANG * 100
+    mau = "#16A34A" if DTI < NGUONG - 0.1 else ("#F59E0B" if DTI < NGUONG else "#DC2626")
+    html(
+        f'<div class="gauge"><div class="g-head"><span>Mức độ an toàn</span>'
+        f'<span><b style="color:{mau}">{DTI * 100:.2f}%</b></span></div>'
+        f'<div class="g-track" style="--a:{canh_bao_vt}%;--t:{nguong_vt}%">'
+        f'<div class="g-fill" style="width:{vi_tri}%;background:{mau}"></div>'
+        f'<div class="g-thr" style="left:{nguong_vt}%"><span>Ngưỡng {nguong_pct:g}%</span></div></div>'
+        f'<div class="g-scale"><span>0%</span><span>🟢 An toàn · 🟡 Cảnh báo · 🔴 Vượt ngưỡng</span><span>120%</span></div></div>'
+    )
 
-    m1, m2 = st.columns(2)
-    with m1:
-        if stv > 0:
-            buoc_vay = 10_000_000 if stv >= 100_000_000 else 1_000_000
-            stv_s = st.slider(
-                "Số tiền vay (VNĐ)", 0, int(stv), int(stv), step=buoc_vay, key=f"s_stv_{v}",
-            )
-            st.caption(f"→ {vnd(stv_s)}")
-        else:
-            stv_s = 0
-        thv_s = st.slider(
-            "Thời hạn vay (năm)", 1, int(max(THOI_HAN_TOI_DA, thv)), int(thv), key=f"s_thv_{v}",
-        )
-        ls_s = st.number_input(
-            "Lãi suất (%/năm)", min_value=0.0, value=float(ls), step=0.1, format="%.2f",
-            key=f"s_ls_{v}",
-            help="Có thể thử lãi suất ưu đãi / gói vay khác.",
-        )
-    with m2:
-        if nc > 0:
-            nc_s = st.slider(
-                "Nợ cũ / tháng (VNĐ)", 0, int(nc), int(nc), step=100_000, key=f"s_nc_{v}",
-            )
-            st.caption(f"→ {vnd(nc_s)}")
-        else:
-            nc_s = 0
-        tn_tran = int(max(tn * 3, tn + 50_000_000))
-        tn_s = st.slider(
-            "Thu nhập / tháng (VNĐ)", int(tn), tn_tran, int(tn), step=500_000, key=f"s_tn_{v}",
-        )
-        st.caption(f"→ {vnd(tn_s)}")
-        sn_s = st.number_input(
-            "Số người phụ thuộc chi phí", min_value=1, value=int(sn), step=1, key=f"s_sn_{v}",
-        )
+du_dia = NGUONG * con_lai - tong_no
+html(
+    '<div class="kpis">'
+    f'<div class="kpi"><div class="kpi-l">Tổng trả nợ / tháng</div><div class="kpi-v">{trieu(tong_no)}</div>'
+    f'<div class="kpi-s" style="color:#64748B">Vay mới {trieu(tra_moi)} + nợ cũ {trieu(nc)}</div></div>'
+    f'<div class="kpi"><div class="kpi-l">Thu nhập còn lại / tháng</div><div class="kpi-v">{trieu(con_lai)}</div>'
+    f'<div class="kpi-s" style="color:#64748B">Sau chi phí sinh hoạt {trieu(chi_phi)}</div></div>'
+    f'<div class="kpi"><div class="kpi-l">{"Dư địa trả nợ" if du_dia >= 0 else "Vượt khả năng trả"}</div>'
+    f'<div class="kpi-v" style="color:{"#16A34A" if du_dia >= 0 else "#DC2626"}">{trieu(abs(du_dia))}</div>'
+    f'<div class="kpi-s" style="color:#64748B">so với ngưỡng {nguong_pct:g}%</div></div>'
+    '</div>'
+)
 
-    dti_s = tinh_dti(stv_s, thv_s, ls_s / 100, nc_s, tn_s, cpsh, sn_s, PT)
-    tra_s = tra_hang_thang(stv_s, thv_s, ls_s / 100, PT)
+# =====================================================================
+# GIẢI PHÁP
+# =====================================================================
+T = min(muc_tieu / 100, NGUONG) - 0.0005  # chừa biên nhỏ để luôn dưới mục tiêu
+giai_phap = []  # mỗi phần tử: dict(icon, title, value, detail, dti, status, tip)
 
-    r1, r2, r3 = st.columns(3)
-    if dti_s is None:
-        r1.metric("DTI sau điều chỉnh", "—")
+# 1. Giảm số tiền vay
+if con_lai <= 0:
+    giai_phap.append(dict(icon="💰", title="Giảm số tiền vay", value="Không áp dụng",
+                          detail="Thu nhập còn lại ≤ 0, cần tăng thu nhập trước.", dti="—", status="na", tip=""))
+else:
+    dd = T * con_lai - nc
+    if dd <= 0:
+        giai_phap.append(dict(icon="💰", title="Giảm số tiền vay", value="Không khả thi",
+                              detail=f"Riêng nợ cũ {trieu(nc)}/tháng đã vượt mức cho phép.",
+                              dti="—", status="na", tip=""))
     else:
-        delta = None if DTI is None else f"{(dti_s - DTI) * 100:+.2f}%"
-        r1.metric("DTI sau điều chỉnh", f"{dti_s * 100:.2f}%", delta=delta, delta_color="inverse")
-    r2.metric("Trả khoản vay mới / tháng", vnd(tra_s))
-    r3.metric("Tổng trả nợ / tháng", vnd(tra_s + nc_s))
+        stv_max = min(stv, math.floor(dd / tra_hang_thang(1, thv, LS, PT) / TRIEU) * TRIEU)
+        d = tinh_dti(stv_max, thv, LS, nc, tn, cpsh, sn, PT)
+        them = ""
+        if thv < THOI_HAN_TOI_DA:
+            stv_max2 = math.floor(dd / tra_hang_thang(1, THOI_HAN_TOI_DA, LS, PT) / TRIEU) * TRIEU
+            them = f" Nếu vay {THOI_HAN_TOI_DA} năm: tối đa {trieu(stv_max2)}."
+        giai_phap.append(dict(
+            icon="💰", title="Giảm số tiền vay", value=f"Tối đa {trieu(stv_max)}",
+            detail=f"Giảm {trieu(stv - stv_max)} so với đề nghị, giữ thời hạn {thv} năm.{them}",
+            dti=pct(d), status="ok",
+            tip="Bổ sung phần thiếu bằng vốn tự có hoặc chọn phương án/tài sản giá trị thấp hơn."))
+
+# 2. Kéo dài thời hạn
+if con_lai <= 0 or stv == 0:
+    giai_phap.append(dict(icon="⏳", title="Kéo dài thời hạn vay", value="Không áp dụng",
+                          detail="Thu nhập còn lại ≤ 0 hoặc không có khoản vay.", dti="—", status="na", tip=""))
+else:
+    n_min = next((n for n in range(thv, 101)
+                  if (tinh_dti(stv, n, LS, nc, tn, cpsh, sn, PT) or 9) < T), None)
+    if n_min is None:
+        giai_phap.append(dict(icon="⏳", title="Kéo dài thời hạn vay", value="Không khả thi",
+                              detail="Tiền lãi và nợ cũ đã vượt mức cho phép.", dti="—", status="na", tip=""))
+    elif n_min > THOI_HAN_TOI_DA:
+        d = tinh_dti(stv, THOI_HAN_TOI_DA, LS, nc, tn, cpsh, sn, PT)
+        giai_phap.append(dict(
+            icon="⏳", title="Kéo dài thời hạn vay", value=f"Cần {n_min} năm",
+            detail=f"Vượt mức tối đa {THOI_HAN_TOI_DA} năm. Vay {THOI_HAN_TOI_DA} năm thì DTI còn {pct(d)}.",
+            dti=pct(d), status="warn", tip="Cần kết hợp với giải pháp khác (xem tab Mô phỏng)."))
+    else:
+        d = tinh_dti(stv, n_min, LS, nc, tn, cpsh, sn, PT)
+        giai_phap.append(dict(
+            icon="⏳", title="Kéo dài thời hạn vay", value=f"{n_min} năm",
+            detail=f"Từ {thv} lên {n_min} năm, trả {trieu(tra_hang_thang(stv, n_min, LS, PT))}/tháng.",
+            dti=pct(d), status="ok",
+            tip="Trả hàng tháng giảm nhưng tổng lãi cả kỳ tăng; có thể trả trước hạn khi có điều kiện."))
+
+# 3. Trả bớt nợ cũ
+if con_lai <= 0:
+    giai_phap.append(dict(icon="📉", title="Trả bớt nợ cũ", value="Không áp dụng",
+                          detail="Thu nhập còn lại ≤ 0, cần tăng thu nhập trước.", dti="—", status="na", tip=""))
+elif nc == 0:
+    giai_phap.append(dict(icon="📉", title="Trả bớt nợ cũ", value="Không có nợ cũ",
+                          detail="Khách hàng không có khoản nợ cũ.", dti="—", status="na", tip=""))
+else:
+    nc_max = T * con_lai - tra_moi
+    if nc_max < 0:
+        d = tinh_dti(stv, thv, LS, 0, tn, cpsh, sn, PT)
+        giai_phap.append(dict(
+            icon="📉", title="Trả bớt nợ cũ", value="Chưa đủ",
+            detail=f"Tất toán toàn bộ nợ cũ thì DTI vẫn còn {pct(d)}.",
+            dti=pct(d), status="warn", tip="Cần kết hợp với giải pháp khác (xem tab Mô phỏng)."))
+    else:
+        nc_max = math.floor(nc_max / 1000) * 1000
+        d = tinh_dti(stv, thv, LS, nc_max, tn, cpsh, sn, PT)
+        giai_phap.append(dict(
+            icon="📉", title="Trả bớt nợ cũ", value=f"Còn ≤ {trieu(nc_max)}/tháng",
+            detail=f"Giảm {trieu(nc - nc_max)}/tháng so với hiện tại ({trieu(nc)}).",
+            dti=pct(d), status="ok",
+            tip="Tất toán trước khoản vay nhỏ / thẻ tín dụng hoặc cơ cấu lại nợ cũ."))
+
+# 4. Tăng thu nhập
+tn_min = math.ceil((tong_no / T + chi_phi) / 100_000) * 100_000
+d = tinh_dti(stv, thv, LS, nc, tn_min, cpsh, sn, PT)
+giai_phap.append(dict(
+    icon="👥", title="Tăng thu nhập / người đồng vay", value=f"Thu nhập ≥ {trieu(tn_min)}",
+    detail=f"Cần tăng thêm {trieu(tn_min - tn)}/tháng so với hiện tại.",
+    dti=pct(d), status="ok",
+    tip="Bổ sung người đồng vay (vợ/chồng, người thân) hoặc chứng minh thêm nguồn thu."))
+
+# =====================================================================
+# TABS
+# =====================================================================
+st.write("")
+tab1, tab2, tab3 = st.tabs(["💡 Giải pháp đề xuất", "🎛️ Mô phỏng kết hợp", "📋 Chi tiết tính toán"])
+
+with tab1:
+    can_tu_van = DTI is None or DTI >= T
+    if not can_tu_van:
+        html(f'<div class="plan">✅ <b>{ten}</b> đã đạt DTI mục tiêu ({muc_tieu:g}%), không cần điều chỉnh.</div>')
+        st.write("")
+        dd = T * con_lai - nc
+        if dd > 0:
+            han_muc = math.floor(dd / tra_hang_thang(1, thv, LS, PT) / TRIEU) * TRIEU
+            han_muc2 = math.floor(dd / tra_hang_thang(1, THOI_HAN_TOI_DA, LS, PT) / TRIEU) * TRIEU
+            html(
+                f'<div class="sol ok" style="min-height:0"><div class="sol-h"><span class="sol-t">💰 Hạn mức vay tối đa</span>'
+                f'<span class="badge b-ok">Tham khảo</span></div><div class="sol-v">{trieu(han_muc)}</div>'
+                f'<div class="sol-d">Với thời hạn {thv} năm, lãi suất {ls:g}%/năm. '
+                f'Nếu vay {THOI_HAN_TOI_DA} năm: tối đa {trieu(han_muc2)}.</div></div>'
+            )
+    else:
+        st.caption(f"Mỗi giải pháp chỉ thay đổi **một** yếu tố để đưa DTI xuống dưới **{muc_tieu:g}%**.")
+
+    BADGE = {"ok": ("Đạt mục tiêu", "b-ok"), "warn": ("Chưa đủ", "b-warn"), "na": ("Không khả thi", "b-na")}
+    cols = st.columns(2)
+    for i, g in enumerate(giai_phap):
+        nhan, lop = BADGE[g["status"]]
+        if not can_tu_van:
+            break
+        with cols[i % 2]:
+            html(
+                f'<div class="sol {g["status"]}"><div class="sol-h"><span class="sol-t">{g["icon"]} {g["title"]}</span>'
+                f'<span class="badge {lop}">{nhan}</span></div>'
+                f'<div class="sol-v">{g["value"]}</div><div class="sol-d">{g["detail"]}</div>'
+                f'<div class="sol-d" style="margin-top:4px">DTI sau điều chỉnh: <b>{g["dti"]}</b></div>'
+                + (f'<div class="sol-tip">💬 {g["tip"]}</div>' if g["tip"] else "")
+                + '</div>'
+            )
+
+with tab2:
+    st.caption("Kéo các thanh trượt để kết hợp nhiều giải pháp cùng lúc. Bấm lại **Thẩm định hồ sơ** để đặt lại.")
+    v = st.session_state.get("lan", 0)
+    s1, s2 = st.columns(2)
+    with s1:
+        stv_s = st.slider("Số tiền vay (triệu đ)", 0.0, float(max(stv_tr, 10.0)), float(stv_tr),
+                          step=10.0 if stv_tr >= 100 else 1.0, format="%.0f", key=f"a{v}")
+        thv_s = st.slider("Thời hạn vay (năm)", 1, int(max(THOI_HAN_TOI_DA, thv)), int(thv), key=f"b{v}")
+        ls_s = st.slider("Lãi suất (%/năm)", 0.0, float(max(ls * 2, 20.0)), float(ls), step=0.1,
+                         format="%.1f", key=f"c{v}")
+    with s2:
+        nc_s = st.slider("Nợ cũ / tháng (triệu đ)", 0.0, float(max(nc_tr, 1.0)), float(nc_tr), step=0.5,
+                         format="%.1f", key=f"d{v}")
+        tn_s = st.slider("Thu nhập / tháng (triệu đ)", float(tn_tr), float(max(tn_tr * 3, tn_tr + 50)),
+                         float(tn_tr), step=0.5, format="%.1f", key=f"e{v}")
+        sn_s = st.slider("Số người phụ thuộc chi phí", 1, int(max(sn, 10)), int(sn), key=f"f{v}")
+
+    dti_s = tinh_dti(stv_s * TRIEU, thv_s, ls_s / 100, nc_s * TRIEU, tn_s * TRIEU, cpsh, sn_s, PT)
+    tra_s = tra_hang_thang(stv_s * TRIEU, thv_s, ls_s / 100, PT)
+    dat_s = dti_s is not None and dti_s < NGUONG and thv_s <= THOI_HAN_TOI_DA
 
     if dti_s is None:
-        st.error("❌ Thu nhập vẫn không đủ trang trải chi phí sinh hoạt.")
-    elif thv_s > THOI_HAN_TOI_DA:
-        st.warning(f"⚠️ Thời hạn {thv_s} năm vượt mức tối đa {THOI_HAN_TOI_DA} năm.")
-    elif dti_s < NGUONG_DTI:
-        st.success(f"✅ **ĐƯỢC VAY** với phương án này — DTI = {dti_s * 100:.2f}% < {nguong_pct:g}%")
+        html('<div class="result fail"><div><div class="r-label">DTI mô phỏng</div><div class="r-value">—</div></div>'
+             '<div><div class="r-status">✖ CHƯA ĐẠT</div><div class="r-sub">Thu nhập chưa đủ chi phí sinh hoạt</div></div></div>')
     else:
-        st.error(f"❌ Chưa đạt — DTI = {dti_s * 100:.2f}% vẫn từ {nguong_pct:g}% trở lên")
+        thay = "" if DTI is None else f"{(dti_s - DTI) * 100:+.2f}% so với ban đầu"
+        html(
+            f'<div class="result {"ok" if dat_s else "fail"}"><div><div class="r-label">DTI mô phỏng</div>'
+            f'<div class="r-value">{dti_s * 100:.2f}%</div></div>'
+            f'<div><div class="r-status">{"✔ ĐỦ ĐIỀU KIỆN" if dat_s else "✖ CHƯA ĐẠT"}</div>'
+            f'<div class="r-sub">{thay} · Trả {trieu(tra_s + nc_s * TRIEU)}/tháng</div></div></div>'
+        )
 
-    # Tóm tắt phương án để tư vấn khách hàng
     thay_doi = []
-    if stv_s != stv:
-        thay_doi.append(f"giảm số tiền vay xuống {vnd(stv_s)}")
+    if stv_s != stv_tr:
+        thay_doi.append(f"số tiền vay <b>{trieu(stv_s * TRIEU)}</b>")
     if thv_s != thv:
-        thay_doi.append(f"{'kéo dài' if thv_s > thv else 'rút ngắn'} thời hạn vay thành {thv_s} năm")
+        thay_doi.append(f"thời hạn <b>{thv_s} năm</b>")
     if abs(ls_s - ls) > 1e-9:
-        thay_doi.append(f"lãi suất {ls_s:.2f}%/năm")
-    if nc_s != nc:
-        thay_doi.append(f"giảm nợ cũ còn {vnd(nc_s)}/tháng")
-    if tn_s != tn:
-        thay_doi.append(f"nâng thu nhập lên {vnd(tn_s)}/tháng (tăng {vnd(tn_s - tn)})")
+        thay_doi.append(f"lãi suất <b>{ls_s:.1f}%/năm</b>")
+    if nc_s != nc_tr:
+        thay_doi.append(f"nợ cũ còn <b>{trieu(nc_s * TRIEU)}/tháng</b>")
+    if tn_s != tn_tr:
+        thay_doi.append(f"thu nhập <b>{trieu(tn_s * TRIEU)}/tháng</b>")
     if sn_s != sn:
-        thay_doi.append(f"số người phụ thuộc chi phí: {sn_s}")
-
+        thay_doi.append(f"<b>{sn_s}</b> người phụ thuộc")
     if thay_doi:
-        st.info(
-            f"📝 **Phương án tư vấn cho khách hàng {ten_hien_thi}:** "
-            + "; ".join(thay_doi)
-            + (f" → DTI = {dti_s * 100:.2f}%." if dti_s is not None else ".")
-        )
+        html(f'<div class="plan">📝 <b>Phương án tư vấn cho {ten}:</b> ' + "; ".join(thay_doi) + ".</div>")
+
+with tab3:
+    bang = pd.DataFrame(
+        [
+            ["Phương thức trả nợ", PT],
+            ["Gốc trả " + ("hàng tháng" if PT == PT_GOC_DEU else "tháng đầu"), vnd(goc_1)],
+            ["Lãi trả " + ("hàng tháng" if PT == PT_GOC_DEU else "tháng đầu"), vnd(lai_1)],
+            ["Khoản vay mới / tháng", vnd(tra_moi)],
+            ["Nợ cũ / tháng", vnd(nc)],
+            ["Tổng nợ phải trả / tháng", vnd(tong_no)],
+            ["Thu nhập hàng tháng", vnd(tn)],
+            [f"Chi phí sinh hoạt ({sn} người)", vnd(chi_phi)],
+            ["Thu nhập còn lại", vnd(con_lai)],
+            ["Chỉ số DTI", pct(DTI)],
+        ],
+        columns=["Khoản mục", "Giá trị"],
+    )
+    st.dataframe(bang, hide_index=True, width="stretch")
+    st.caption("DTI = Tổng nợ phải trả hàng tháng / (Thu nhập − Chi phí sinh hoạt × Số người)")
+
+html('<div class="foot">© 2026 · Nguyễn Viết Minh Khánh · Công cụ hỗ trợ học tập, kết quả mang tính tham khảo</div>')
